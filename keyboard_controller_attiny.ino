@@ -49,11 +49,12 @@
 #define PS2_EXTEND      0xe0
 #define PS2_ACK         0xfa
 
+#define PS2_CMD_RESET   0xff
 #define PS2_CMD_SET_LED 0xed
 #define PS2_CMD_SET_SCANCODE_SET 0xf0
 #define PS2_CMD_SET_KEY_MAKEBREAK 0xfc
 #define PS2_CMD_SET_ALL_TYPEMATIC_MAKE_BREAK 0xfa
-#define PS2_CMD_ENABLE 0xf4
+#define PS2_CMD_ENABLE  0xf4
 
 uint8_t flags = 0x00;
 #define FLAGS_BREAK     0x01
@@ -219,9 +220,9 @@ uint8_t read_kb_byte() {
 // typematic+make+break
 bool kb_reset() {
     uint8_t response;
-    send_kb_byte(0xff);
+    send_kb_byte(PS2_CMD_RESET);
     response = read_kb_byte();
-    if(response != 0xfa)
+    if(response != PS2_ACK)
         return false;
     delay(100);
     response = read_kb_byte();
