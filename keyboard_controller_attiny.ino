@@ -11,7 +11,7 @@
     Reset |1 RST   VCC 8| VCC
   PS2 CLK |2 D3     D2 7| Shift CLK
  PS2 DATA |3 D4     D1 6| Shift DATA
-      GND |4 GND    D0 5| CPU Interrupt
+      GND |4 GND    D0 5| CPU Interrupt - pulse low on keystroke
           |             |
           `-------------'
 
@@ -203,7 +203,7 @@ uint8_t read_kb_byte() {
     }
 
     // check parity
-	if(calc_parity(kb_byte)) {
+    if(calc_parity(kb_byte)) {
         // kb_byte has odd parity, so parity_bit should be zero
         if(parity_bit == 0) return kb_byte;
     }
@@ -306,22 +306,24 @@ bool kb_set_key_make_break(uint8_t *keys) {
 
 void setup() {
     uint8_t no_typematic[] = {
-		SC3_numLock,
-		SC3_capsLock,
-		SC3_leftShift,
-		SC3_leftCtrl,
-		SC3_leftGui,
-		SC3_leftWindows,
-		SC3_leftAlt,
-		SC3_rightShift,
-		SC3_rightCtrl,
-		SC3_rightGui,
-		SC3_rightWindows,
-		SC3_rightAlt,
-		0x00
-	};
+        SC3_numLock,
+        SC3_capsLock,
+        SC3_leftShift,
+        SC3_leftCtrl,
+        SC3_leftGui,
+        SC3_leftWindows,
+        SC3_leftAlt,
+        SC3_rightShift,
+        SC3_rightCtrl,
+        SC3_rightGui,
+        SC3_rightWindows,
+        SC3_rightAlt,
+        0x00
+    };
+    // release the interrupt pin as quickly as possible
+    PORT |= CPU_INT_MASK;
 
-    pinMode(CPU_INT_PIN, INPUT);
+    pinMode(CPU_INT_PIN, OUTPUT);
     pinMode(PS2_CLK_PIN, INPUT_PULLUP);
     pinMode(PS2_DATA_PIN, INPUT_PULLUP);
     pinMode(SHIFT_CLK_PIN, OUTPUT);
@@ -448,18 +450,18 @@ void loop() {
                 kb_set_led();
             }
             return;
-		case SC3_f1:
-		case SC3_f2:
-		case SC3_f3:
-		case SC3_f4:
-		case SC3_f5:
-		case SC3_f6:
-		case SC3_f7:
-		case SC3_f8:
-		case SC3_f9:
-		case SC3_f10:
-		case SC3_f11:
-		case SC3_f12:
+        case SC3_f1:
+        case SC3_f2:
+        case SC3_f3:
+        case SC3_f4:
+        case SC3_f5:
+        case SC3_f6:
+        case SC3_f7:
+        case SC3_f8:
+        case SC3_f9:
+        case SC3_f10:
+        case SC3_f11:
+        case SC3_f12:
             // With F-keys, the translator will end up returning normal
             // ASCII 1-0, ! and @, but with FLAGS_FUNC set.  After sending
             // the translated keycode + flags we clear this bit.
@@ -467,9 +469,17 @@ void loop() {
             break;
     }
     // get translated key
-	        
+    // TODO replace kb_byte with an ASCII code instead of raw scancode
+            
+    // send translated key and flags to shift registers
     shiftOut(SHIFT_DATA_PIN, SHIFT_CLK_PIN, LSBFIRST, kb_byte);
     shiftOut(SHIFT_DATA_PIN, SHIFT_CLK_PIN, LSBFIRST, flags);
+
+    // signal the CPU that a keystroke has occurred
+    PORT &= ~CPU_INT_MASK;
+    PORT |= CPU_INT_MASK;
+    //digitalWrite(CPU_INT_PIN, 0);
+    //digitalWrite(CPU_INT_PIN, 1);
 
     // clear the FUNC flag before pulling the next keystroke
     flags &= ~FLAGS_FUNC;
