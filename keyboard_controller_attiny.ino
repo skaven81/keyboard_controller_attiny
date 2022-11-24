@@ -2,6 +2,7 @@
 
 #include "Arduino.h"
 #include "scancode_set_3.h"
+#include "scancode_to_ascii.h"
 
 /*
 
@@ -46,7 +47,6 @@
 #define BAD_STOP_BIT    0xfd
 
 #define PS2_BREAK       0xf0
-#define PS2_EXTEND      0xe0
 #define PS2_ACK         0xfa
 
 #define PS2_CMD_RESET   0xff
@@ -230,8 +230,9 @@ bool kb_reset() {
 }
 
 // Send LED state (scroll=1, num=2, caps=4).
-void kb_set_led() {
+bool kb_set_led() {
     uint8_t kb_flags = 0;
+    uint8_t response;
     if((flags & FLAGS_SCROLLLOCK) > 0)
         kb_flags |= 0x01;
     if((flags & FLAGS_NUMLOCK) > 0)
@@ -240,6 +241,8 @@ void kb_set_led() {
         kb_flags |= 0x04;
     send_kb_byte(PS2_CMD_SET_LED);
     send_kb_byte(kb_flags);
+    response = read_kb_byte();
+    return response == PS2_ACK;
 }
 
 // Send 0xf0 (set scancode set)
@@ -383,7 +386,7 @@ void setup() {
 void loop() {
     uint8_t kb_byte = 0x00;
     uint8_t translated_byte = 0x00;
-    bool is_extend = 0;
+    uint8_t mask = 0x01;
 
     // reset the break flag when starting
     flags &= ~FLAGS_BREAK;
@@ -393,7 +396,7 @@ void loop() {
 
     // Catch conditions where we need to wait for
     // a second byte from the keyboard, such as
-    // breaks or extended scancodes
+    // breaks or errors
     switch(kb_byte) {
         case BAD_START_BIT:
         case BAD_STOP_BIT:
@@ -404,33 +407,35 @@ void loop() {
             delay(200);
             return;
         case PS2_BREAK:
+            // A make code is just the scancode, and so the
+            // flags byte will have FLAGS_BREAK low due to
+            // the above reset.  But a break code will match
+            // PS2_BREAK and then the next scancode will be
+            // the key that was released, so we set the FLAGS_BREAK
+            // bit and then read the next scancode.
             flags |= FLAGS_BREAK;
-            kb_byte = read_kb_byte();
-            break;
-        case PS2_EXTEND:
-            is_extend = 1;
             kb_byte = read_kb_byte();
             break;
     }
 
     // Catch conditions that aren't actual keystrokes we
     // send to the CPU, such as shift/alt/ctrl, and update
-    // flags accordingly
+    // flags accordingly.
     switch(kb_byte) {
         case SC3_leftShift:
         case SC3_rightShift:
-            if((flags & FLAGS_BREAK) == 0)  flags &= ~FLAGS_SHIFT;
-            else                            flags |= FLAGS_SHIFT;
+            if((flags & FLAGS_BREAK) > 0)  flags &= ~FLAGS_SHIFT;
+            else                           flags |= FLAGS_SHIFT;
             return;
         case SC3_leftCtrl:
         case SC3_rightCtrl:
-            if((flags & FLAGS_BREAK) == 0)  flags &= ~FLAGS_CTRL;
-            else                            flags |= FLAGS_CTRL;
+            if((flags & FLAGS_BREAK) > 0)  flags &= ~FLAGS_CTRL;
+            else                           flags |= FLAGS_CTRL;
             return;
         case SC3_leftAlt:
         case SC3_rightAlt:
-            if((flags & FLAGS_BREAK) == 0)  flags &= ~FLAGS_ALT;
-            else                            flags |= FLAGS_ALT;
+            if((flags & FLAGS_BREAK) > 0)  flags &= ~FLAGS_ALT;
+            else                           flags |= FLAGS_ALT;
             return;
         case SC3_numLock:
             if((flags & FLAGS_BREAK) == 0) {
@@ -468,18 +473,83 @@ void loop() {
             flags |= FLAGS_FUNC;
             break;
     }
-    // get translated key
-    // TODO replace kb_byte with an ASCII code instead of raw scancode
-            
-    // send translated key and flags to shift registers
-    shiftOut(SHIFT_DATA_PIN, SHIFT_CLK_PIN, LSBFIRST, kb_byte);
-    shiftOut(SHIFT_DATA_PIN, SHIFT_CLK_PIN, LSBFIRST, flags);
 
+    // get translated key
+    translated_byte = scancode_to_ascii[kb_byte];
+
+    // if shift is active and capslock is not, or
+    // if shift is inactive and capslock is active, then
+    // capitalize the current character, provided the keystroke
+    // was not a function key
+    if( ( ((flags & FLAGS_FUNC) == 0) && ((flags & FLAGS_SHIFT) > 0) && ((flags & FLAGS_CAPSLOCK) == 0) ) ||
+        ( ((flags & FLAGS_FUNC) == 0) && ((flags & FLAGS_SHIFT) == 0) && ((flags & FLAGS_CAPSLOCK) > 0) ) ) {
+
+        if(translated_byte >= 'a' && translated_byte <= 'z') {
+            translated_byte -= 0x20;
+        }
+        else {
+            switch(translated_byte) {
+                case '`': translated_byte = '~'; break;
+                case '1': translated_byte = '!'; break;
+                case '2': translated_byte = '@'; break;
+                case '3': translated_byte = '#'; break;
+                case '4': translated_byte = '$'; break;
+                case '5': translated_byte = '%'; break;
+                case '6': translated_byte = '^'; break;
+                case '7': translated_byte = '&'; break;
+                case '8': translated_byte = '*'; break;
+                case '9': translated_byte = '('; break;
+                case '0': translated_byte = ')'; break;
+                case '-': translated_byte = '_'; break;
+                case '=': translated_byte = '+'; break;
+                case 0x5c: translated_byte = '|'; break;
+                case ';': translated_byte = ':'; break;
+                case '\'': translated_byte = '"'; break;
+                case '[': translated_byte = '{'; break;
+                case ']': translated_byte = '}'; break;
+                case ',': translated_byte = '<'; break;
+                case '.': translated_byte = '>'; break;
+                case '/': translated_byte = '?'; break;
+            }
+        }
+    }
+
+    // send translated key and flags to shift registers
+    mask = 0x01;
+    PORT &= ~SHIFT_CLK_MASK;
+    while(1) {
+        if((translated_byte & mask) == 0)
+            PORT &= ~SHIFT_DATA_MASK;
+        else
+            PORT |= SHIFT_DATA_MASK;
+        PORT |= SHIFT_CLK_MASK;
+        PORT &= ~SHIFT_CLK_MASK;
+        if(mask == 0x80) break;
+        mask = (mask << 1);
+    }
+    mask = 0x01;
+    while(1) {
+        if((flags & mask) == 0)
+            PORT &= ~SHIFT_DATA_MASK;
+        else
+            PORT |= SHIFT_DATA_MASK;
+        PORT |= SHIFT_CLK_MASK;
+        PORT &= ~SHIFT_CLK_MASK;
+        if(mask == 0x80) break;
+        mask = (mask << 1);
+    }
+    // clear the shift data just for tidiness on the scope
+    PORT &= ~SHIFT_DATA_MASK;
+    // since we have SCLK and SRCLK tied together, the shift
+    // register is one pulse behind the storage registers.  So
+    // we need to pulse the clock one more time to get the right
+    // data to appear.
+    PORT |= SHIFT_CLK_MASK;
+    PORT &= ~SHIFT_CLK_MASK;
+    
     // signal the CPU that a keystroke has occurred
     PORT &= ~CPU_INT_MASK;
     PORT |= CPU_INT_MASK;
-    //digitalWrite(CPU_INT_PIN, 0);
-    //digitalWrite(CPU_INT_PIN, 1);
 
     // clear the FUNC flag before pulling the next keystroke
     flags &= ~FLAGS_FUNC;
