@@ -104,25 +104,27 @@ uint8_t scancode_to_ascii[] = {
     0x08, // SC3_backspace  0x66
     0x0f, // SC3_insert     0x67
     0x00, //                0x68
-    '1',  // SC3_keypad1    0x69
+    0x1e, // SC3_keypad1    0x69 (end)
     0x1a, // SC3_rightArrow 0x6a
-    '4',  // SC3_keypad4    0x6b
-    '7',  // SC3_keypad7    0x6c
+    0x1b, // SC3_keypad4    0x6b (left arrow)
+    0x02, // SC3_keypad7    0x6c (home)
     0x0c, // SC3_pageDown   0x6d
     0x02, // SC3_home       0x6e
     0x0b, // SC3_pageUp     0x6f
-    '0',  // SC3_keypad0    0x70
-    '.',  // SC3_keypadPeriod 0x71
-    '2',  // SC3_keypad2    0x72
+    0x0f, // SC3_keypad0    0x70 (insert)
+    0x7f, // SC3_keypadPeriod 0x71 (del)
+    0x19, // SC3_keypad2    0x72 (down arrow)
     '5',  // SC3_keypad5    0x73
-    '6',  // SC3_keypad6    0x74
-    '8',  // SC3_keypad8    0x75
+    0x1a, // SC3_keypad6    0x74 (right arrow)
+    0x18, // SC3_keypad8    0x75 (up arrow)
     0x00, // SC3_numLock    0x76
+    '/',  // SC3_keypadSlash 0x77
+    0x00, //                0x78
     0x0d, // SC3_keypadEnter 0x79
-    '3',  // SC3_keypad3    0x7a
+    0x0c, // SC3_keypad3    0x7a (page down)
     0x00, //                0x7b
     '+',  // SC3_keypadPlus 0x7c
-    '9',  // SC3_keypad9    0x7d
+    0x0b, // SC3_keypad9    0x7d (page up)
     '*',  // SC3_keypadAsterisk   0x7e
     0x00, //                0x7f
     0x00, //                0x80
@@ -133,7 +135,6 @@ uint8_t scancode_to_ascii[] = {
     0x00, //                0x85
     0x00, //                0x86
     0x00, //                0x87
-    0x00, //                0x88
     0x00, //                0x88
     0x00, //                0x89
     0x00, //                0x8a

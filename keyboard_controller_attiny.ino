@@ -426,17 +426,17 @@ void loop() {
         case SC3_rightShift:
             if((flags & FLAGS_BREAK) > 0)  flags &= ~FLAGS_SHIFT;
             else                           flags |= FLAGS_SHIFT;
-            return;
+            break;
         case SC3_leftCtrl:
         case SC3_rightCtrl:
             if((flags & FLAGS_BREAK) > 0)  flags &= ~FLAGS_CTRL;
             else                           flags |= FLAGS_CTRL;
-            return;
+            break;
         case SC3_leftAlt:
         case SC3_rightAlt:
             if((flags & FLAGS_BREAK) > 0)  flags &= ~FLAGS_ALT;
             else                           flags |= FLAGS_ALT;
-            return;
+            break;
         case SC3_numLock:
             if((flags & FLAGS_BREAK) == 0) {
                 flags ^= FLAGS_NUMLOCK;
@@ -472,6 +472,23 @@ void loop() {
             // the translated keycode + flags we clear this bit.
             flags |= FLAGS_FUNC;
             break;
+    }
+
+    // Translate the keypad keys into numbers if numlock is on
+    if((flags & FLAGS_NUMLOCK) > 0) {
+        switch(kb_byte) {
+            case SC3_keypadPeriod:  kb_byte = SC3_period; break;
+            case SC3_keypad0:       kb_byte = SC3_0; break;
+            case SC3_keypad1:       kb_byte = SC3_1; break;
+            case SC3_keypad2:       kb_byte = SC3_2; break;
+            case SC3_keypad3:       kb_byte = SC3_3; break;
+            case SC3_keypad4:       kb_byte = SC3_4; break;
+            case SC3_keypad5:       kb_byte = SC3_5; break;
+            case SC3_keypad6:       kb_byte = SC3_6; break;
+            case SC3_keypad7:       kb_byte = SC3_7; break;
+            case SC3_keypad8:       kb_byte = SC3_8; break;
+            case SC3_keypad9:       kb_byte = SC3_9; break;
+        }
     }
 
     // get translated key

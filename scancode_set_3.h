@@ -34,7 +34,7 @@
 #define SC3_7             0x3d
 #define SC3_8             0x3e
 #define SC3_9             0x46
-#define SC3_keypadSlash   0x4a
+#define SC3_keypadSlash   0x77
 #define SC3_keypadAsterisk   0x7e
 #define SC3_keypadDash    0x4e
 #define SC3_keypadPlus    0x7c
